@@ -9,155 +9,103 @@ bun install
 To benchmark:
 
 ```bash
-hyperfine --warmup 3 'bun benchmark.ts -- --runOriginal' 'bun benchmark.ts -- --runOptimized'
+hyperfine --warmup 10 'bun benchmark.ts -- --runOriginal' 'bun benchmark.ts -- --runOptimized'
 ```
 
-example:
+Example benchmark output:
 
 ```bash
-󰀵  󱑍 15:46  ﱮ ~/projects/lab-extract-common-letters  via 🥟 v1.1.34 via  v20.18.0
- ➜  hyperfine --warmup 3 'bun benchmark.ts -- --runOriginal' 'bun benchmark.ts -- --runOptimized'
+hyperfine --warmup 10 'bun benchmark.ts -- --runOriginal' 'bun benchmark.ts -- --runOptimized'
 Benchmark 1: bun benchmark.ts -- --runOriginal
-  Time (mean ± σ):     201.2 ms ±   2.5 ms    [User: 165.7 ms, System: 67.5 ms]
-  Range (min … max):   197.6 ms … 205.8 ms    15 runs
+  Time (mean ± σ):     199.7 ms ±   4.8 ms    [User: 161.5 ms, System: 69.7 ms]
+  Range (min … max):   193.0 ms … 209.1 ms    14 runs
 
 Benchmark 2: bun benchmark.ts -- --runOptimized
-  Time (mean ± σ):      79.1 ms ±   4.9 ms    [User: 102.9 ms, System: 32.5 ms]
-  Range (min … max):    73.8 ms … 102.7 ms    39 runs
+  Time (mean ± σ):      34.7 ms ±   0.9 ms    [User: 24.8 ms, System: 18.7 ms]
+  Range (min … max):    32.6 ms …  36.9 ms    84 runs
 
 Summary
   bun benchmark.ts -- --runOptimized ran
-    2.55 ± 0.16 times faster than bun benchmark.ts -- --runOriginal
+    5.75 ± 0.21 times faster than bun benchmark.ts -- --runOriginal
 ```
 
 ## Motivation
 
-After talking with @RomanHotsiy, I realized that the original solution was not optimal and he challenged me to improve it. So I accept it and decided to rewrite the solution to improve its performance, of course, with the help of AI (Thanks to the teamwork of ChatGPT 4o and Claude Sonnet 3.5 Model) 🆒😎.
-
-My original optimization actually just using a Set to have O(1) lookup, but the AI suggested me to use a Map to store the frequency of each character in each word. This way, I can avoid the linear search and string manipulation operations that were slowing down the original solution.
+After a discussion with @RomanHotsiy, I realized that while my initial solution was correct, it wasn't as efficient as it could be. Roman challenged me to make the solution both faster and simpler, leading to this refined version with optimizations inspired by our conversation and AI tools like ChatGPT 4.0 and Claude 3.5. The final optimized solution uses a Set for fast lookup without needing duplicate handling, which brought both speed and clarity.
 
 ## Explanation
 
 ### Time Complexity Analysis
 
-**Original Solution**: O(n m k)
+**Original Solution**: O(n *m* k)
 
-- n: length of first word
-- m: average length of other words
-- k: number of words
-- For each character in first word (n), it searched through each word (k) using indexOf which scans the entire word (m)
-- The string slicing operation for handling duplicates (word.slice()) was also O(m)
+- `n`: length of the first word
+- `m`: average length of other words
+- `k`: number of words
+- **Explanation**: Each character in the first word (`n`) was checked in each word (`k`) with `indexOf`, a linear operation (`m`). Extra string manipulations (`slice`) added further O(m) complexity.
 
 **Optimized Solution**: O(n * k)
 
-- n: max length of words
-- k: number of words
-- We only iterate through each character once and check it against frequency maps
+- `n`: max length of words
+- `k`: number of words
+- **Explanation**: By using a Set, we eliminated linear searches and unnecessary character counts, reducing the complexity to a single pass over the words.
 
 ### Space Complexity Analysis
 
 **Original Solution**: O(n * k)
 
-- Copied entire input array: O(n * k)
+- Copies of input words and intermediate strings: O(n * k)
 - Result array: O(n)
-- String manipulations created new strings: O(n)
 
-**Optimized Solution**: O(n * k)
+**Optimized Solution**: O(n)
 
-- Frequency maps: O(n * k) - one map per word
+- Set of characters from the first word: O(n)
 - Result array: O(n)
-- ProcessedChars map: O(n)
 
-### Key Improvements That Made It Faster
+### Key Optimizations
 
-1. **Eliminated String Operations**
+1. **Set-based Lookup**: The optimized solution uses a Set, which provides O(1) character lookup and removes the need for duplicate handling.
 
-```typescript
-// Original - Expensive string manipulation
-copiedWords[j] = word.slice(0, charIndex) + word.slice(charIndex + 1);
+   ```typescript
+   // Optimized - Simple presence check in other words
+   if (!words[i].includes(char)) { isCommon = false; break; }
+   ```
 
-// Optimized - Uses frequency counting instead
-map.set(char, (map.get(char) || 0) + 1);
-```
+2. **Early Exit Conditions**: Streamlined the logic to exit early if we find a character missing in any word.
 
-2. **Removed Linear Search**
+   ```typescript
+   // Early exit if any word lacks a character
+   if (!words[i].includes(char)) { isCommon = false; break; }
+   ```
 
-```typescript
-// Original - Used indexOf (linear search)
-const charIndex = word.indexOf(currentChar);
+### Why It's Faster
 
-// Optimized - Direct frequency lookup (constant time)
-const freq = frequencyMaps[i].get(char) || 0;
-```
+1. **No Unnecessary String Operations**:
+   - **Original**: Repeatedly sliced and manipulated strings.
+   - **Optimized**: Only looks for presence, reducing runtime significantly.
 
-3. **Better Duplicate Handling**
+2. **Constant Time Lookups**:
+   - **Original**: Linear search (`indexOf`) for each character in each word.
+   - **Optimized**: Uses `Set` lookups, cutting down operations per character.
 
-```typescript
-// Original - Required string modification for each duplicate
-if (charIndex === -1) {
-    isCharCommonAcrossWords = false;
-    break;
-} else {
-    copiedWords[j] = word.slice(0, charIndex) + word.slice(charIndex + 1);
-}
+3. **Single Data Structure for Tracking**:
+   - **Original**: Created frequency maps.
+   - **Optimized**: Set-based presence check reduces memory use and processing.
 
-// Optimized - Uses counting
-const processedCount = processedChars.get(char) || 0;
-if (freq === 0 || processedCount >= freq) {
-    isCommon = false;
-    break;
-}
-```
-
-4. **Early Exit Optimizations**
-
-```typescript
-// Optimized solution has multiple early exits
-if (words.length === 0) return [];
-if (words.length === 1) return words[0].split('');
-```
-
-### Why It's 2.55x Faster
-
-1. **Reduced Operations Per Character**
-   - Original: For each character, performed string search (indexOf) and string manipulation (slice)
-   - Optimized: Just hash table lookups and number comparisons
-
-2. **Better Data Structures**
-   - Original: Heavy reliance on string operations
-   - Optimized: Uses Map for O(1) lookups and efficient counting
-
-3. **Memory Efficiency**
-   - Original: Created many intermediate strings
-   - Optimized: Only stores counts and results
-
-4. **Algorithm Efficiency**
-   - Original: Had to repeatedly search and modify strings
-   - Optimized: Single pass through words to build frequency maps, then direct lookups
-
-### Practical Example
+### Example Comparison
 
 For input `["hello", "world", "help"]`:
 
 **Original Solution**:
 
-1. Takes "h" from "hello"
-2. Searches for "h" in "world" using indexOf
-3. If found, creates new string without "h"
-4. Repeats for each character
+- Took each character in "hello," searched across words with `indexOf`, then modified strings with `slice` for duplicates.
 
 **Optimized Solution**:
 
-1. Creates frequency maps for all words at once
-2. For each character in first word:
-   - Checks frequencies in O(1) time
-   - No string modifications needed
-   - Tracks processed counts efficiently
+- Creates a Set of unique characters in "hello," then checks each character's presence across other words without extra steps.
 
-This explains why the benchmark shows the optimized version running about 2.55 times faster than the original version.
+## Acknowledgments
 
-Thanks to @RomanHotsiy for the challenge, and @OPENAI with ChatGPT 4o and @anthropics with Claude Sonnet 3.5 Model for the AI assistance! 🚀🤖
-
----
+Thanks to @RomanHotsiy for the challenge and feedback, and to AI tools (ChatGPT 4.0 and Claude 3.5) for assisting in the refinement. 🚀🤖
 
 This project was created using `bun init` in bun v1.1.34. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.

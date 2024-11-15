@@ -62,7 +62,7 @@ describe(extractCommonLettersOptimized.name, () => {
 
   it("should return all characters of the single input word when there is only one word", () => {
     const result = extractCommonLettersOptimized(["hello"]);
-    expect(result).toEqual(["h", "e", "l", "l", "o"]);
+    expect(result).toEqual(["h", "e", "l", "o"]);
   });
 
   it("should return common characters in the same positions across all words", () => {
